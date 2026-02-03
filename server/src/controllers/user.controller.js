@@ -153,9 +153,11 @@ const signOut = asyncHandler(async (req, res) => {
 });
 
 const updateProfile = asyncHandler(async (req, res) => {
+    const { bio } = req.body;
+
     const user = await User.findByIdAndUpdate(
         req.user._id,
-        { $set: req.body },
+        { $set: { bio } },
         {
             new: true,
             runValidators: true,
@@ -174,6 +176,10 @@ const updateProfile = asyncHandler(async (req, res) => {
 const sendFriendRequest = asyncHandler(async (req, res) => {
     const senderId = req.user._id;
     const { receiverId } = req.body;
+
+    if (!isValidObjectId(receiverId)) {
+        throw new ApiError(400, "Invalid user id");
+    }
 
     if (senderId.equals(receiverId)) {
         throw new ApiError(400, "You cannot send a friend request to yourself");
@@ -213,21 +219,36 @@ const sendFriendRequest = asyncHandler(async (req, res) => {
     });
 
     if (reverseRequest) {
-        await Promise.all([
-            reverseRequest.updateOne({ status: "accepted" }),
-            User.updateOne(
-                { _id: senderId },
-                { $addToSet: { friends: receiverId } }
-            ),
-            User.updateOne(
-                { _id: receiverId },
-                { $addToSet: { friends: senderId } }
-            )
-        ]);
+        const session = await mongoose.startSession();
+        session.startTransaction();
 
-        return res.status(200).json(
-            new ApiResponse(200, null, "Friend request accepted automatically")
-        );
+        try {
+            await Promise.all([
+                reverseRequest.updateOne({ status: "accepted" }, { session }),
+                User.updateOne(
+                    { _id: senderId },
+                    { $addToSet: { friends: receiverId } },
+                    { session }
+                ),
+                User.updateOne(
+                    { _id: receiverId },
+                    { $addToSet: { friends: senderId } },
+                    { session }
+                )
+            ]);
+
+            await session.commitTransaction();
+
+            return res.status(200).json(
+                new ApiResponse(200, null, "Friend request accepted automatically")
+            );
+
+        } catch (error) {
+            await session.abortTransaction();
+            throw error;
+        } finally {
+            session.endSession();
+        }
     }
 
     // 🚀 Create request atomically
@@ -384,7 +405,7 @@ const getFriends = asyncHandler(async (req, res) => {
 });
 
 const removeFriend = asyncHandler(async (req, res) => {
-    const { friendId } = req.body;
+    const { friendId } = req.params;
     const userId = req.user._id;
 
     if (!isValidObjectId(friendId)) {
@@ -664,6 +685,10 @@ const getCommonFriends = asyncHandler(async (req, res) => {
 
     if (!isValidObjectId(targetId)) {
         throw new ApiError(400, "Invalid user id");
+    }
+    const targetUser = await User.findById(targetId).lean();
+    if (!targetUser) {
+        throw new ApiError(404, "User not found");
     }
 
     const page = Math.max(parseInt(req.query.page) || 1, 1);
