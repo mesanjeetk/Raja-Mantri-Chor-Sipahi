@@ -22,10 +22,16 @@ export const errorHandler = (err, req, res, next) => {
 
     // Mongoose Duplicate Key Error (code: 11000)
     if (err.code === 11000) {
-        const field = Object.keys(err.keyValue)[0];
-        const value = err.keyValue[field];
-        const message = `${field.charAt(0).toUpperCase() + field.slice(1)} '${value}' already exists`;
-        error = new ApiError(409, message);
+        // Safely check if keyValue exists and is non-empty
+        if (err.keyValue && Object.keys(err.keyValue).length > 0) {
+            const field = Object.keys(err.keyValue)[0];
+            // Don't echo user-provided value - only use field name
+            const message = `${field.charAt(0).toUpperCase() + field.slice(1)} already exists`;
+            error = new ApiError(409, message);
+        } else {
+            // Fallback if keyValue is not available
+            error = new ApiError(409, "Duplicate key error");
+        }
     }
 
     // Mongoose CastError (Invalid ObjectId or type casting)
@@ -105,8 +111,8 @@ export const errorHandler = (err, req, res, next) => {
     // CUSTOM API ERRORS
     // ============================================================================
 
-    // Handle custom ApiError instances
-    if (err instanceof ApiError) {
+    // Handle custom ApiError instances - check this first to avoid redundant processing
+    else if (err instanceof ApiError) {
         error.statusCode = err.statusCode;
         error.message = err.message;
     }

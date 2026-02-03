@@ -6,7 +6,13 @@ import { env } from "../config/env.js";
 
 const verifyJWT = asyncHandler(async (req, res, next) => {
     try {
-        const token = req.cookies?.accessToken || req.header("Authorization").replace("Bearer ", "");
+        // Safely extract Authorization header to prevent undefined errors
+        const authHeader = req.header("Authorization");
+        const tokenFromHeader = authHeader ? authHeader.replace("Bearer ", "") : null;
+
+        // Try cookie first, then header
+        const token = req.cookies?.accessToken || tokenFromHeader;
+
         if (!token) {
             throw new ApiError(401, "Unauthorized");
         }

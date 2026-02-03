@@ -3,6 +3,7 @@ import { ApiResponse } from "../lib/ApiResponse.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { generateToken } from "../lib/tokens.js";
 import { User } from "../models/user.model.js";
+import { env } from "../config/env.js";
 
 
 const signUp = asyncHandler(async (req, res) => {
@@ -23,26 +24,32 @@ const signUp = asyncHandler(async (req, res) => {
 
     const { accessToken, refreshToken } = generateToken(user._id);
 
+    // Build response object - only include tokens for non-browser clients
     const response = {
         user: {
             _id: user._id,
             username: user.username,
             email: user.email
-        },
-        accessToken,
-        refreshToken
+        }
+    };
+
+    // Include tokens in JSON only if client explicitly requests it (e.g., mobile apps)
+    const isNonBrowserClient = req.header("X-Client-Type") === "non-browser";
+    if (isNonBrowserClient) {
+        response.accessToken = accessToken;
+        response.refreshToken = refreshToken;
     }
 
     return res
         .cookie("accessToken", accessToken, {
             httpOnly: true,
-            secure: true,
+            secure: env.NODE_ENV === "production",
             sameSite: "strict",
             maxAge: 7 * 24 * 60 * 60 * 1000
         })
         .cookie("refreshToken", refreshToken, {
             httpOnly: true,
-            secure: true,
+            secure: env.NODE_ENV === "production",
             sameSite: "strict",
             maxAge: 30 * 24 * 60 * 60 * 1000
         })
@@ -53,41 +60,46 @@ const signUp = asyncHandler(async (req, res) => {
 const signIn = asyncHandler(async (req, res) => {
     const { email, password } = req.body;
 
-    // Check if user exists
+    // Attempt to find user
     const user = await User.findOne({ email });
+
     if (!user) {
         throw new ApiError(404, "User not found");
     }
 
-    // Check if password is correct
-    const isPasswordValid = await user.comparePassword(password);
-    if (!isPasswordValid) {
+    if (!await user.comparePassword(password)) {
         throw new ApiError(401, "Invalid password");
     }
 
     // Generate JWT token
     const { accessToken, refreshToken } = generateToken(user._id);
 
+    // Build response object - only include tokens for non-browser clients
     const response = {
         user: {
             _id: user._id,
             username: user.username,
             email: user.email
-        },
-        accessToken,
-        refreshToken
+        }
+    };
+
+    // Include tokens in JSON only if client explicitly requests it (e.g., mobile apps)
+    const isNonBrowserClient = req.header("X-Client-Type") === "non-browser";
+    if (isNonBrowserClient) {
+        response.accessToken = accessToken;
+        response.refreshToken = refreshToken;
     }
 
     return res
         .cookie("accessToken", accessToken, {
             httpOnly: true,
-            secure: true,
+            secure: env.NODE_ENV === "production",
             sameSite: "strict",
             maxAge: 7 * 24 * 60 * 60 * 1000
         })
         .cookie("refreshToken", refreshToken, {
             httpOnly: true,
-            secure: true,
+            secure: env.NODE_ENV === "production",
             sameSite: "strict",
             maxAge: 30 * 24 * 60 * 60 * 1000
         })
