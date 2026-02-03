@@ -57,3 +57,12 @@ export const loginSchema = Joi.object({
             'any.required': 'Password is required'
         })
 });
+
+export const updateProfileSchema = Joi.object({
+    bio: Joi.string()
+        .max(100)
+        .optional()
+        .messages({
+            'string.max': 'Bio must not exceed 100 characters'
+        })
+});
