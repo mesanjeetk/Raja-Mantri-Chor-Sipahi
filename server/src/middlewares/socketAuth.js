@@ -15,11 +15,9 @@ export const socketAuthMiddleware = (socket, next) => {
         }
 
         // Verify JWT token
-        const decoded = jwt.verify(token, env.JWT_SECRET);
-
+        const decoded = jwt.verify(token, env.ACCESS_TOKEN_SECRET);
         // Attach user data to socket
         socket.user = decoded;
-
         next();
     } catch (error) {
         console.error("Socket authentication error:", error.message);

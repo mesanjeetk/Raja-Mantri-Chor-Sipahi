@@ -33,6 +33,7 @@ export const signUpSchema = Joi.object({
         }),
     bio: Joi.string()
         .max(100)
+        .allow('')
         .optional()
         .messages({
             'string.max': 'Bio must not exceed 100 characters'
@@ -61,6 +62,7 @@ export const loginSchema = Joi.object({
 export const updateProfileSchema = Joi.object({
     bio: Joi.string()
         .max(100)
+        .allow('')
         .optional()
         .messages({
             'string.max': 'Bio must not exceed 100 characters'
