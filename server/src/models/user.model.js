@@ -62,4 +62,10 @@ userSchema.methods.toJSON = function () {
     return user;
 };
 
+
+userSchema.index({ friends: 1 });
+userSchema.index({ blockedUsers: 1 });
+
+
+
 export const User = mongoose.model("User", userSchema);
