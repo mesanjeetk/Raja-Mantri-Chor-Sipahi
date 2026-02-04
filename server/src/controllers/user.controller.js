@@ -27,7 +27,7 @@ const signUp = asyncHandler(async (req, res) => {
         bio: bio || ""
     });
 
-    const { accessToken, refreshToken } = generateToken(user._id);
+    const { accessToken, refreshToken } = generateToken(user._id, user.username);
 
     // Build response object - only include tokens for non-browser clients
     const response = {
@@ -41,9 +41,9 @@ const signUp = asyncHandler(async (req, res) => {
     // Include tokens in JSON only if client explicitly requests it (e.g., mobile apps)
     const isNonBrowserClient = req.header("X-Client-Type") === "non-browser";
     if (isNonBrowserClient) {
-        response.accessToken = accessToken;
         response.refreshToken = refreshToken;
     }
+    response.accessToken = accessToken;
 
     return res
         .cookie("accessToken", accessToken, {
@@ -77,7 +77,7 @@ const signIn = asyncHandler(async (req, res) => {
     }
 
     // Generate JWT token
-    const { accessToken, refreshToken } = generateToken(user._id);
+    const { accessToken, refreshToken } = generateToken(user._id, user.username);
 
     // Build response object - only include tokens for non-browser clients
     const response = {
@@ -91,9 +91,9 @@ const signIn = asyncHandler(async (req, res) => {
     // Include tokens in JSON only if client explicitly requests it (e.g., mobile apps)
     const isNonBrowserClient = req.header("X-Client-Type") === "non-browser";
     if (isNonBrowserClient) {
-        response.accessToken = accessToken;
         response.refreshToken = refreshToken;
     }
+    response.accessToken = accessToken;
 
     return res
         .cookie("accessToken", accessToken, {
@@ -774,4 +774,43 @@ const getCommonFriends = asyncHandler(async (req, res) => {
     );
 });
 
-export { signUp, signIn, getMe, signOut, updateProfile, sendFriendRequest, acceptOrRejectRequest, getPendingRequests, getFriends, removeFriend, blockUser, unblockUser, getBlockedUsers, getSuggestedFriends, getCommonFriends }
+const refreshAccessToken = asyncHandler(async (req, res) => {
+    const { refreshToken } = req.cookies;
+    if (!refreshToken) {
+        throw new ApiError(401, "Refresh token not found");
+    }
+    const decodedToken = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
+    const user = await User.findById(decodedToken.id);
+    if (!user) {
+        throw new ApiError(401, "Invalid refresh token");
+    }
+    const accessToken = generateAccessToken(user._id);
+
+    const isNonBrowserClient = req.header("X-Client-Type") === "non-browser";
+
+    const response = {}
+
+    if (isNonBrowserClient) {
+        response.accessToken = accessToken;
+    }
+
+    return res
+        .status(200)
+        .cookie("accessToken", accessToken, {
+            httpOnly: true,
+            secure: env.NODE_ENV === "production",
+            sameSite: "strict",
+            maxAge: 7 * 24 * 60 * 60 * 1000
+        })
+        .json(
+            new ApiResponse(
+                200,
+                response,
+                "Access token refreshed successfully"
+            )
+        );
+});
+
+
+
+export { signUp, signIn, getMe, signOut, updateProfile, sendFriendRequest, acceptOrRejectRequest, getPendingRequests, getFriends, removeFriend, blockUser, unblockUser, getBlockedUsers, getSuggestedFriends, getCommonFriends, refreshAccessToken }

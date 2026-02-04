@@ -14,7 +14,8 @@ import {
     unblockUser,
     getBlockedUsers,
     getSuggestedFriends,
-    getCommonFriends
+    getCommonFriends,
+    refreshAccessToken
 } from "../controllers/user.controller.js";
 import { validate } from "../middlewares/validate.middleware.js";
 import { signUpSchema, loginSchema, updateProfileSchema } from "../validators/user.validator.js";
@@ -23,9 +24,10 @@ import { verifyJWT } from "../middlewares/auth.middleware.js";
 const router = express.Router();
 
 // Public routes
-router.post("/signup", validate(signUpSchema), signUp);
-router.post("/signin", validate(loginSchema), signIn);
+router.post("/sign-up", validate(signUpSchema), signUp);
+router.post("/sign-in", validate(loginSchema), signIn);
 
+router.post("/refresh-token", refreshAccessToken);
 
 router.get("/me", verifyJWT, getMe);
 router.post("/signout", verifyJWT, signOut);
@@ -41,5 +43,6 @@ router.post("/unblock", verifyJWT, unblockUser);
 router.get("/blocked", verifyJWT, getBlockedUsers);
 router.get("/suggested-friends", verifyJWT, getSuggestedFriends);
 router.get("/common-friends/:userId", verifyJWT, getCommonFriends);
+
 
 export default router;
