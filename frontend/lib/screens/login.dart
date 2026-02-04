@@ -20,55 +20,54 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
 
-  void prettyPrintJson(String jsonString) {
-    final object = jsonDecode(jsonString);
-    final prettyString = const JsonEncoder.withIndent('  ').convert(object);
-    debugPrint(prettyString);
-  }
-
   Future<void> _login() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = true;
-      });
-      try {
-        final response = await http.post(
-          Uri.parse('http://localhost:8080/api/users/sign-in'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'email': _emailController.text,
-            'password': _passwordController.text,
-          }),
-        );
+  if (!_formKey.currentState!.validate()) return;
 
-        debugPrint('Pretty Response:');
-        prettyPrintJson(response.body);
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('accessToken', data.data['accessToken']);
-          // Navigate to home page
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (_) => HomePage(userEmail: _emailController.text),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Login failed: ${response.body}')),
-          );
-        }
-      } catch (e) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
-      } finally {
-        setState(() {
-          _isLoading = false;
-        });
+  setState(() => _isLoading = true);
+
+  try {
+    final response = await http.post(
+      Uri.parse('http://localhost:8080/api/users/sign-in'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'email': _emailController.text,
+        'password': _passwordController.text,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      // ✅ Proper UTF-8 decode
+      final Map<String, dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
+
+      final accessToken = data['data']?['accessToken'];
+
+
+      if (accessToken == null) {
+        throw Exception('Access token missing in response');
       }
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('accessToken', accessToken);
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => HomePage(userEmail: _emailController.text),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Login failed: ${response.body}')),
+      );
     }
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error: $e')),
+    );
+  } finally {
+    setState(() => _isLoading = false);
   }
+}
+
 
   @override
   Widget build(BuildContext context) {
